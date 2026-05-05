@@ -1,0 +1,167 @@
+---
+title: "biostatm238_hw2"
+date: today
+format:
+  html:
+    theme: cosmo
+    embed-resources: true
+    number-sections: true
+    toc: true
+    toc-depth: 4
+    toc-location: left
+    code-fold: false
+engine: knitr
+knitr:
+  opts_chunk: 
+    fig.align: 'center'
+    # fig.width: 6
+    # fig.height: 4
+    message: FALSE
+    cache: false
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = FALSE, warning = F)
+```
+
+```{r load packages}
+library(GA) # to try
+library(tidyverse)
+library(pso)
+```
+
+## Problem 5
+
+### Setup
+
+```{r}
+# regression function
+beta <- function(x) {
+  c(1, x) # SLR
+}
+
+# get information matrix
+info_matrix <- function(points, weights, beta_func) {
+  # points: vector of support points like c(1, 1)
+  # weights: vector of weights like c(0.3, 0.7) that sums to 1
+  k <- length(beta_func(points[1]))  # should be 2 for SLR
+  M <- matrix(0, k, k) # initialize k by k matrix of 0
+  # loop through to add contribution of each support point
+  for(i in 1:length(points)) {
+    f <- beta_func(points[i])
+    M <- M + weights[i] * outer(f, f)
+  } 
+  # add small term for stability
+  M <- M + 1e-6 * diag(k)
+  return(M)
+}
+
+# A-optimality criterion 
+a_criterion <- function(points, weights, beta_func) {
+  M <- info_matrix(points, weights, beta_func) # apply previous function to inputs
+  invM <- solve(M) # find inverse
+  return(sum(diag(invM)))  # trace
+}
+```
+
+### PSO on 2 points
+
+```{r}
+# wrapper function to apply a_criterion on single vector containing both points and weights (for 2 point design)
+# needed to use psoptim 
+pso_2pt <- function(params){
+  # params[1] = first point
+  # params[2] = second point  
+  # params[3] = weight at first point (weight at second is 1-params[3])
+  points <- c(params[1], params[2])
+  weights <- c(params[3], 1- params[3])
+  return(a_criterion(points, weights, beta))
+}
+
+# [-1,1]
+set.seed(789)
+result_1 <- psoptim(
+  par = c(0, 0.5, 0.5),  # start with points at 0 and 0.5, equal weight
+  fn = pso_2pt,
+  lower = c(-1, -1, 0.01),
+  upper = c(1, 1, 0.99),
+  control = list(maxit = 500, trace = FALSE, s = 50)
+)
+
+# Results
+cat("[-1, 1] Results:\n")
+cat("Optimal design points: x1 =", round(result_1$par[1], 4), 
+    ", x2 =", round(result_1$par[2], 4), "\n")
+cat("Optimal weight at x1: w =", round(result_1$par[3], 4), "\n")
+cat("Optimal weight at x2:", round(1 - result_1$par[3], 4), "\n")
+
+# [3,49]
+set.seed(789)
+result_3_49 <- psoptim(
+  par = c(20, 30, 0.1),  # start with points at 0 and 0.5, equal weight
+  fn = pso_2pt,
+  lower = c(3, 3, 0.01),
+  upper = c(49, 49, 0.99),
+  control = list(maxit = 500, trace = FALSE, s = 50)
+)
+
+# Results
+cat("[3, 49] Results:\n")
+cat("Optimal design points: x1 =", round(result_3_49$par[1], 4), 
+    ", x2 =", round(result_3_49$par[2], 4), "\n")
+cat("Optimal weight at x1: w =", round(result_3_49$par[3], 4), "\n")
+cat("Optimal weight at x2:", round(1 - result_3_49$par[3], 4), "\n")
+```
+
+### Confirm optimal design with plot
+
+```{r}
+# sensitivity function for A-optimality
+sensitivity <- function(x, points, weights, beta_func) {
+  M <- info_matrix(points, weights, beta_func)
+  invM <- solve(M)
+  f_x <- beta_func(x)
+  as.numeric(t(f_x) %*% invM %*% invM %*% f_x) - sum(diag(invM))
+}
+
+# Plot function
+plot_sensitivity <- function(pso_result, beta_func, interval) {
+  # Extract design
+  x1 <- pso_result$par[1]
+  x2 <- pso_result$par[2]
+  w <- pso_result$par[3]
+  points <- c(x1, x2)
+  weights <- c(w, 1 - w)
+  
+  # Compute sensitivity across interval
+  x_grid <- seq(interval[1], interval[2], length.out = 500)
+  sens_vals <- sapply(x_grid, function(x) {
+    sensitivity(x, points, weights, beta_func)
+  })
+  
+  # Sensitivity at support points
+  sens_at_points <- sapply(points, function(x) {
+    sensitivity(x, points, weights, beta_func)
+  })
+  
+  # Plot
+  plot(x_grid, sens_vals, type = "l", 
+       xlab = "x", 
+       ylab = expression(phi(x, xi)),
+       lwd = 2)
+  abline(h = 0, col = "red", lty = 2, lwd = 1.5)
+  points(points, sens_at_points, col = "blue", pch = 16, cex = 1.2)
+  legend("bottomright", 
+         legend = c("Sensitivity", "Zero", "Support points"),
+         col = c("black", "red", "blue"), 
+         lty = c(1, 2, NA), 
+         pch = c(NA, NA, 16),
+         lwd = c(2, 1.5, NA))
+}
+
+# Plot both designs
+plot_sensitivity(result_1, beta, c(-1, 1))
+
+plot_sensitivity(result_3_49, beta, c(3, 49))
+```
