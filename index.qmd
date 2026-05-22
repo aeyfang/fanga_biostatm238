@@ -1,6 +1,5 @@
 ---
 title: "Biostatistics M238"
-subtitle: "Your Name | UCLA | Spring 2025"
 ---
 
 ## Assignments
