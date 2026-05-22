@@ -1,3 +1,12 @@
 ---
 title: "Biostatistics M238"
+subtitle: "Your Name | UCLA | Spring 2025"
+---
+
+## Assignments
+
+| Assignment |
+|------------|
+| [Homework 2](homework2.qmd) |
+| [Homework 3](homework3.qmd) |
 ---
