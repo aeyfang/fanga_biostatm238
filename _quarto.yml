@@ -4,6 +4,14 @@ project:
 
 website:
   title: "Biostatistics M238"
+  navbar:
+    left:
+      - href: index.qmd
+        text: Home
+      - href: homework2.qmd
+        text: Homework 2
+      - href: homework3.qmd
+        text: Homework 3
 
 format:
   html:
