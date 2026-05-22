@@ -1,0 +1,130 @@
+---
+title: "Biostat M238 Homework 3"
+date: today
+format:
+  html:
+    theme: cosmo
+    embed-resources: true
+    number-sections: true
+    toc: true
+    toc-depth: 4
+    toc-location: left
+    code-fold: false
+engine: knitr
+knitr:
+  opts_chunk: 
+    fig.align: 'center'
+    # fig.width: 6
+    # fig.height: 4
+    message: FALSE
+    cache: false
+---
+
+```{r}
+library(tidyverse)
+library(ICAOD)
+```
+
+### Problem 2
+
+I'll assume that the first stage uses $n_1 = 14$ participants. It follows that our desired $n_2$ is 
+$$
+\begin{align}
+SE(p) &= \sqrt{\frac{\pi(1-\pi)}{n_1+n_2}}\\
+0.01 &= \sqrt{\frac{0.5^2}{14+n_2}}\\
+n_2 &= 2486
+\end{align}
+$$
+Then, staying in the "worst-case" scenario where p = 0.5, the 95% CI would be $0.5\pm 1.96*0.01$, which evaluates to $(0.4804, 0.5196)$. Obviously, this is a narrow CI that would be helpful for estimating proportions. However, you need a very large $n_2$ to achieve this. First, this is likely impractical. Secondly, this raises ethical concerns if the intervention in question is not actually effective or beneficial.
+
+### Problem 3
+
+```{r}
+library(clinfun)
+
+(results <- ph2simon(pu = 0.20, pa = 0.45, ep1 = 0.05, ep2 = 0.1))
+out_df <- as.data.frame(results$out)
+```
+
+I'm implemented the Simon's optimal and minimax designs since they were introduced in class. Both designs use the same numerical search over all possible two-stage designs that satisfy the desired Type 1 and 2 error rates.
+
+Since these are numerical methods, I used R. If you print the outcome directly, it gives you the minimax and optimal designs. For practice, I searched through all of the results to verify the designs. The following are the interpretations of the outputs.
+
+1.  **Optimal:** This design minimizes the expect sample size under H_0.
+
+```{r}
+(optimal <- out_df %>% 
+  filter(`EN(p0)` == min(`EN(p0)`)))
+```
+
+The results suggest that the trial should only proceed to Stage 2 if at least 5 of the 16 participants respond in Stage 1. At the end of Stage 2, if a total of at least 12 people responded, there is sufficient evidence to reject the null hypothesis. The expected sample size is 20.44 and the early termination probability is 0.7982.
+
+2.  **Minimax:** This design minimizes that maximum total sample size.
+
+```{r}
+(minimax <- out_df %>% 
+  filter(n == min(n)))
+```
+
+The results suggest that the trials should only proceed to stage 2 if at least 5 of the 19 participants respond in Stage 1. At the end of Stage 2, if a total of at least 10 people responded, there is sufficient evidence to reject the null hypothesis. The expected sample size is 22.27 and the early termination probability is 0.6733.
+
+I verified the above results using UNC's tool for Simon's two-stage design provided in the lecture notes (screenshot below).
+
+![](images/verify-simon.png)
+
+### Problem 5
+
+#### Cubic design for estimating all parameters
+
+```{r}
+fim_cubic <- function(x, w, param) {
+  M <- matrix(0, 4, 4)
+  for (i in seq_along(x)){
+    fv <- c(1, x[i], x[i]^2, x[i]^3) # basic vector
+    M <- M + w[i] * outer (fv,fv)
+  }
+  return(M)
+}
+
+cubic_design <- locally(
+  fimfunc = fim_cubic,
+  lx      = 0, # lower bound of dose
+  ux      = 1, # upper bound of dose
+  k       = 4, # number of support points
+  iter    = 1000,
+  inipars = 1, # dummy parameter
+  ICA.control = list(rseed = 123, trace = F, plot_cost = F)
+)
+
+print(cubic_design)
+plot(cubic_design)  
+```
+
+
+
+#### Fractional polynomial design for all 4 parameters
+
+```{r}
+fim_frac <- function(x, w, param) {
+  M <- matrix(0, 4, 4)
+  for (i in seq_along(x)) {
+    fv <- c(1, sqrt(x[i]), x[i]^2, x[i]^3) # basis vector
+    M  <- M + w[i] * outer(fv, fv)
+  }
+  M
+}
+
+frac_design <- locally(
+  fimfunc     = fim_frac,
+  lx          = 1e-06, # lower bound set equal to small positive number to deal with sqrt
+  ux          = 1, # upper bound
+  k           = 4, # number of parameters
+  iter        = 1000,
+  inipars     = 1, # dummy parameter
+  ICA.control = list(rseed = 123, trace = FALSE, plot_cost = F)
+)
+
+print(frac_design)
+plot(frac_design)
+```
+
